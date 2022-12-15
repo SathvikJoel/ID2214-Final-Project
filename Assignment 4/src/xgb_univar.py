@@ -88,6 +88,43 @@ def run(fold):
 
     print(f"Fold = {fold}, AUC = {auc}")
 
+def final_predictions():
+    df = pd.read_csv('../data/train_folds.csv', index_col = 0)
+    df.drop(['kfold'], axis = 1, inplace = True)
+
+    df['ACTIVE'] = df['ACTIVE'].astype('category')
+
+    df_train, imputation = create_imputation(df)
+    df_test = pd.read_csv('../data/test_folds.csv', index_col=0)
+    df_test = apply_imputation(df_test.drop(['ACTIVE'], axis = 1), imputation)
+
+    # select 200 features using chi2
+    selection = SelectKBest(f_classif, k = 200)
+    x_train = df_train.drop(['ACTIVE'], axis = 1).values
+    y_train = df_train.ACTIVE.values
+
+    selection.fit(x_train, y_train)
+
+    x_train = selection.transform(x_train)
+
+    x_test = df_test.values
+    x_test = selection.transform(x_test)
+
+    model = xgb.XGBClassifier(n_jobs=-1)
+
+    model.fit(x_train, y_train)
+
+    preds = model.predict_proba(x_test)[:, 1]
+
+    df_test['ACTIVE'] = preds
+
+    print(df_test['ACTIVE'])
+
+    #np.savetxt(r'..\data\np.txt', df_test['ACTIVE'].values, fmt='%d')
+    df_test['ACTIVE'].to_frame().to_csv('..\data\pandas.txt', header=None, index=None, sep=' ', mode='a')
+
+
 if __name__ == "__main__":
     for fold_ in tqdm(range(5)):
         run(fold_)
+    final_predictions()
